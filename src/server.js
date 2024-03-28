@@ -26,6 +26,22 @@ app.get('/api/posts', async (req, res) => {
   }
 })
 
+app.get('/api/posts/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const postRef = db.collection('posts').doc(id);
+    const snapshot = await postRef.get();
+    
+    if (!snapshot.exists) {
+      console.log('No such post!')
+      res.sendStatus(404);
+    }else{
+      res.send(snapshot.data())}
+  } catch(error) {
+    res.send(error)
+  }
+})
+
 app.post('/api/posts/add', async (req, res) => {
   try {
     const docRef = await db.collection('posts').add({
