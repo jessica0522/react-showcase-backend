@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import  admin  from 'firebase-admin';
 import express from 'express';
 
@@ -34,12 +34,14 @@ app.use(async (req, res, next) => {
 
 app.get('/api/posts', async (req, res) => {
   try {
-    const postsRef = db.collection('posts');
+    const postsRef = db.collection('posts').orderBy('datetime', 'desc');
     const snapshot = await postsRef.get();
     let responseArr = []
   
     snapshot.forEach(doc => {
-      responseArr.push(doc.data())
+      const data = doc.data();
+      data.datetime = data.datetime.toDate().toLocaleString();
+      responseArr.push(data)
     })
     res.send(responseArr)
   } catch(error) {
@@ -58,7 +60,9 @@ app.get('/api/posts/:id', async (req, res) => {
       console.log('No such post!')
       res.sendStatus(404);
     } else {
-      res.send(snapshot.data())
+      const data = snapshot.data();
+      data.datetime = data.datetime.toDate().toLocaleString();
+      res.send(data)
     }
   } catch (error) {
     res.send(error)
@@ -66,9 +70,13 @@ app.get('/api/posts/:id', async (req, res) => {
 });
 
 app.post('/api/posts/add', async (req, res) => {
+  const { datetime } = req.body;
+  const formattedDate = Timestamp.fromDate(new Date(datetime));
+
   try {
     const docRef = await db.collection('posts').add({
       ...req.body,
+      datetime: formattedDate,
       id: null
     })
     // add generated id into data
