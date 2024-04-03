@@ -1,15 +1,36 @@
-const { initializeApp, applicationDefault, cert } = require('firebase-admin/app');
-const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
-const express = require("express");
-const serviceAccount = require('../serviceAccountKey.json');
+import fs from 'fs';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import  admin  from 'firebase-admin';
+import express from 'express';
+
+const credentials = JSON.parse(
+  fs.readFileSync('./serviceAccountKey.json')
+);
 
 initializeApp({
-  credential: cert(serviceAccount)
+  credential: cert(credentials)
 });
 
 const db = getFirestore();
 const app = express();
 app.use(express.json());
+
+app.use(async (req, res, next) => {
+  const { authtoken } = req.headers;
+
+  if(authtoken){
+      try {
+        const user = await admin.auth().verifyIdToken(authtoken);
+          req.user = user;
+      } catch {
+          return res.sendStatus(401)
+      }
+  }
+  req.user = req.user || {};
+
+  next();
+})
 
 app.get('/api/posts', async (req, res) => {
   try {
@@ -28,6 +49,7 @@ app.get('/api/posts', async (req, res) => {
 
 app.get('/api/posts/:id', async (req, res) => {
   const { id } = req.params;
+
   try {
     const postRef = db.collection('posts').doc(id);
     const snapshot = await postRef.get();
@@ -35,12 +57,13 @@ app.get('/api/posts/:id', async (req, res) => {
     if (!snapshot.exists) {
       console.log('No such post!')
       res.sendStatus(404);
-    }else{
-      res.send(snapshot.data())}
-  } catch(error) {
+    } else {
+      res.send(snapshot.data())
+    }
+  } catch (error) {
     res.send(error)
   }
-})
+});
 
 app.post('/api/posts/add', async (req, res) => {
   try {
