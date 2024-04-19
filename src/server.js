@@ -89,6 +89,78 @@ app.post('/api/posts/add', async (req, res) => {
   }
 })
 
+// PUT API to modify likes field of a post
+app.put('/api/posts/:postId/like', async (req, res) => {
+  try {
+      const postId = req.params.postId;
+    // get user email from token
+    const { email } = req.user;
+
+      // Retrieve the post document from Firestore
+      const postRef = db.collection('posts').doc(postId);
+      const postSnapshot = await postRef.get();
+
+      // Check if the post exists
+      if (!postSnapshot.exists) {
+          return res.status(404).json({ error: 'Post not found' });
+      }
+
+      // Get current likes array from the post data
+      const postData = postSnapshot.data();
+      const currentLikes = postData.likes || [];
+
+      // Check if user email is already in likes array
+      const userIndex = currentLikes.indexOf(email);
+      if (userIndex !== -1) {
+          // User email is already in likes array, so remove it
+          currentLikes.splice(userIndex, 1);
+      } else {
+          // User email is not in likes array, so add it
+          currentLikes.push(email);
+      }
+
+      // Update the 'likes' field of the post document in Firestore
+      await postRef.update({ likes: currentLikes });
+
+      return res.status(200).json(currentLikes);
+  } catch (error) {
+      console.error('Error updating likes:', error);
+      return res.status(500).json({ error: 'Failed to update likes' });
+  }
+});
+
+app.delete('/api/posts/:postId', async (req, res) => {
+  try {
+    const postId = req.params.postId;
+
+    // get user email from token
+    const { email } = req.user;
+
+    // Retrieve the post document from Firestore
+    const postRef = db.collection('posts').doc(postId);
+    const postSnapshot = await postRef.get();
+
+    // Check if the post exists
+    if (!postSnapshot.exists) {
+        return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const postData = postSnapshot.data();
+    const postAuthor = postData.author.email;
+
+    if (email !== postAuthor) {
+      return res.status(400).json({ error: 'You cannot delete the post since you are not the author!' });
+    }
+
+    await postRef.delete();
+
+    return res.status(200).json({ message: 'Post deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    return res.status(500).json({ error: 'Failed to delete post' });
+  }
+})
+
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server is running on PORT ${PORT}`);
