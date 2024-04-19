@@ -1,8 +1,14 @@
 import fs from 'fs';
+import path from 'path';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import  admin  from 'firebase-admin';
 import express from 'express';
+
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename)
+
 
 const credentials = JSON.parse(
   fs.readFileSync('./serviceAccountKey.json')
@@ -15,6 +21,11 @@ initializeApp({
 const db = getFirestore();
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../build')));
+
+app.get(/^(?!\/api).+/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../build/index.html'))
+})
 
 app.use(async (req, res, next) => {
   const { authtoken } = req.headers;
@@ -32,6 +43,7 @@ app.use(async (req, res, next) => {
   next();
 })
 
+// GEt API to query all posts and ordered by created time desc
 app.get('/api/posts', async (req, res) => {
   try {
     const postsRef = db.collection('posts').orderBy('datetime', 'desc');
@@ -49,6 +61,7 @@ app.get('/api/posts', async (req, res) => {
   }
 })
 
+//GET API to fetch single post with postId
 app.get('/api/posts/:id', async (req, res) => {
   const { id } = req.params;
 
@@ -69,6 +82,7 @@ app.get('/api/posts/:id', async (req, res) => {
   }
 });
 
+// POST API to create a new post
 app.post('/api/posts/add', async (req, res) => {
   const { datetime } = req.body;
   const formattedDate = Timestamp.fromDate(new Date(datetime));
@@ -77,6 +91,7 @@ app.post('/api/posts/add', async (req, res) => {
     const docRef = await db.collection('posts').add({
       ...req.body,
       datetime: formattedDate,
+      likes: [],
       id: null
     })
     // add generated id into data
